@@ -92,29 +92,115 @@ class EncoderLayer(nn.Module):
         return x
 
 
-class MultiHeadedAttention(nn.Module):
-    def __init__(self, h, d_model, dropout=0.1):
-        super(MultiHeadedAttention, self).__init__()
-        assert d_model % h == 0
-        self.d_k = d_model // h 
-        self.h = h
-        self.linears = clones(nn.Linear(d_model, d_model), 4)
-        self.attn = None
-        self.dropout = nn.Dropout(p=dropout)
 
-    def forward(self, query, key, value, mask=None):
+# class MultiHeadedAttention(nn.Module):
+#     def __init__(self, h, d_model, dropout=0.1):
+#         super(MultiHeadedAttention, self).__init__()
+#         assert d_model % h == 0
+#         self.d_k = d_model // h 
+#         self.h = h
+#         self.linears = clones(nn.Linear(d_model, d_model), 4)
+#         self.attn = None
+#         self.dropout = nn.Dropout(p=dropout)
+
+#     def forward(self, query, key, value, mask=None):
+#         if mask is not None:
+#             mask = mask.unsqueeze(1)
+#         nbatches = query.size(0)
+
+#         query, key, value = [l(x).view(nbatches, -1, self.h, self.d_k).transpose(1, 2)
+#              for l, x in zip(self.linears, (query, key, value))]
+
+#         x, self.attn = attention(query, key, value, mask=mask,
+#                                  dropout=self.dropout)
+
+#         x = x.transpose(1, 2).contiguous().view(nbatches, -1, self.h * self.d_k)
+#         return self.linears[-1](x)
+
+
+class MultiHeadedAttention(nn.Module):
+# class RelativeMultiHeadAttention(nn.Module):
+    """
+    Multi-head attention with relative positional encoding.
+    This concept was proposed in the "Transformer-XL: Attentive Language Models Beyond a Fixed-Length Context"
+    Args:
+        d_model (int): The dimension of model
+        h (int): The number of attention heads.
+        dropout_p (float): probability of dropout
+    Inputs: query, key, value, pos_embedding, mask
+        - **query** (batch, time, dim): Tensor containing query vector
+        - **key** (batch, time, dim): Tensor containing key vector
+        - **value** (batch, time, dim): Tensor containing value vector
+        - **pos_embedding** (batch, time, dim): Positional embedding tensor
+        - **mask** (batch, 1, time2) or (batch, time1, time2): Tensor containing indices to be masked
+    Returns:
+        - **outputs**: Tensor produces by relative multi head attention module.
+    """
+    def __init__(self, h, d_model, dropout_p=0.1):
+        super(MultiHeadedAttention, self).__init__()
+        assert d_model % h == 0, "d_model % h should be zero."
+        self.d_model = d_model
+        self.d_k = int(d_model / h)
+        self.h = h
+        self.sqrt_dim = math.sqrt(d_model)
+
+        self.query_proj = nn.Linear(d_model, d_model)
+        self.key_proj = nn.Linear(d_model, d_model)
+        self.value_proj = nn.Linear(d_model, d_model)
+        self.pos_proj = nn.Linear(d_model, d_model, bias=False)
+
+        self.dropout = nn.Dropout(p=dropout_p)
+        self.u_bias = nn.Parameter(torch.Tensor(self.h, self.d_k))
+        self.v_bias = nn.Parameter(torch.Tensor(self.h, self.d_k))
+        torch.nn.init.xavier_uniform_(self.u_bias)
+        torch.nn.init.xavier_uniform_(self.v_bias)
+
+        self.out_proj = nn.Linear(d_model, d_model)
+
+    def forward(
+            self,
+            query: Tensor,
+            key: Tensor,
+            value: Tensor,
+            pos_embedding: Tensor,
+            mask: Optional[Tensor] = None,
+    ) -> Tensor:
+        batch_size = value.size(0)
+
+        query = self.query_proj(query).view(batch_size, -1, self.h, self.d_k)
+        key = self.key_proj(key).view(batch_size, -1, self.h, self.d_k).permute(0, 2, 1, 3)
+        value = self.value_proj(value).view(batch_size, -1, self.h, self.d_k).permute(0, 2, 1, 3)
+        pos_embedding = self.pos_proj(pos_embedding).view(batch_size, -1, self.h, self.d_k)
+
+        content_score = torch.matmul((query + self.u_bias).transpose(1, 2), key.transpose(2, 3))
+        pos_score = torch.matmul((query + self.v_bias).transpose(1, 2), pos_embedding.permute(0, 2, 3, 1))
+        pos_score = self._compute_relative_positional_encoding(pos_score)
+
+        score = (content_score + pos_score) / self.sqrt_dim
+
         if mask is not None:
             mask = mask.unsqueeze(1)
-        nbatches = query.size(0)
+            score.masked_fill_(mask, -1e9)
 
-        query, key, value = [l(x).view(nbatches, -1, self.h, self.d_k).transpose(1, 2)
-             for l, x in zip(self.linears, (query, key, value))]
+        attn = F.softmax(score, -1)
+        attn = self.dropout(attn)
 
-        x, self.attn = attention(query, key, value, mask=mask,
-                                 dropout=self.dropout)
+        context = torch.matmul(attn, value).transpose(1, 2)
+        context = context.contiguous().view(batch_size, -1, self.d_model)
 
-        x = x.transpose(1, 2).contiguous().view(nbatches, -1, self.h * self.d_k)
-        return self.linears[-1](x)
+        return self.out_proj(context)
+
+    def _compute_relative_positional_encoding(self, pos_score: Tensor) -> Tensor:
+        batch_size, h, seq_length1, seq_length2 = pos_score.size()
+        zeros = pos_score.new_zeros(batch_size, h, seq_length1, 1)
+        padded_pos_score = torch.cat([zeros, pos_score], dim=-1)
+
+        padded_pos_score = padded_pos_score.view(batch_size, h, seq_length2 + 1, seq_length1)
+        pos_score = padded_pos_score[:, :, 1:].view_as(pos_score)
+
+        return pos_score
+
+
 
 
 class PositionwiseFeedForward(nn.Module):
