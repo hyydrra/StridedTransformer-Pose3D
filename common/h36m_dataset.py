@@ -235,7 +235,7 @@ class Human36mDataset(MocapDataset):
             self._data[subject] = {}
             for action_name, positions in actions.items():
                 self._data[subject][action_name] = {
-                    'positions': positions,
+                    'positions': positions[0:100],
                     'cameras': self._cameras[subject],
                 }
 
