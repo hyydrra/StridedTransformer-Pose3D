@@ -159,11 +159,11 @@ class MultiHeadedAttention(nn.Module):
 
     def forward(
             self,
-            query: Tensor,
-            key: Tensor,
-            value: Tensor,
-            pos_embedding: Tensor,
-            mask: Optional[Tensor] = None,
+            query,
+            key,
+            value,
+            pos_embedding,
+            mask= None,
     ) -> Tensor:
         batch_size = value.size(0)
 
@@ -190,7 +190,7 @@ class MultiHeadedAttention(nn.Module):
 
         return self.out_proj(context)
 
-    def _compute_relative_positional_encoding(self, pos_score: Tensor) -> Tensor:
+    def _compute_relative_positional_encoding(self, pos_score):
         batch_size, h, seq_length1, seq_length2 = pos_score.size()
         zeros = pos_score.new_zeros(batch_size, h, seq_length1, 1)
         padded_pos_score = torch.cat([zeros, pos_score], dim=-1)
