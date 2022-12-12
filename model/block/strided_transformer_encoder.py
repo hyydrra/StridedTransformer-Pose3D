@@ -163,8 +163,7 @@ class MultiHeadedAttention(nn.Module):
             key,
             value,
             pos_embedding,
-            mask= None,
-    ) -> Tensor:
+            mask= None):
         batch_size = value.size(0)
 
         query = self.query_proj(query).view(batch_size, -1, self.h, self.d_k)
