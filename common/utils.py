@@ -12,7 +12,16 @@ def deterministic_random(min_value, max_value, data):
 
 def mpjpe_cal(predicted, target):
     assert predicted.shape == target.shape
-    return torch.mean(torch.norm(predicted - target, dim=len(target.shape) - 1))
+    er = torch.norm(predicted - target, dim=len(target.shape) - 1)
+    if target.shape[1] >1:
+      er = er.cpu().detach().numpy()
+      x = list(range(1,target.shape[1]+1))
+      x[target.shape[1]-1] = 10*x[target.shape[1]-1] 
+      x = torch.tensor([x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x,x]).T.numpy()
+      x = x/target.shape[1]
+      er = torch.from_numpy(er * x[None,...])
+
+    return torch.mean(er)
 
 
 def test_calculation(predicted, target, action, error_sum, data_type, subject):
