@@ -117,25 +117,8 @@ class EncoderLayer(nn.Module):
 #         x = x.transpose(1, 2).contiguous().view(nbatches, -1, self.h * self.d_k)
 #         return self.linears[-1](x)
 
-
 class MultiHeadedAttention(nn.Module):
 # strided:
-    """
-    Multi-head attention with relative positional encoding.
-    This concept was proposed in the "Transformer-XL: Attentive Language Models Beyond a Fixed-Length Context"
-    Args:
-        d_model (int): The dimension of model
-        h (int): The number of attention heads.
-        dropout_p (float): probability of dropout
-    Inputs: query, key, value, pos_embedding, mask
-        - **query** (batch, time, dim): Tensor containing query vector
-        - **key** (batch, time, dim): Tensor containing key vector
-        - **value** (batch, time, dim): Tensor containing value vector
-        - **pos_embedding** (batch, time, dim): Positional embedding tensor
-        - **mask** (batch, 1, time2) or (batch, time1, time2): Tensor containing indices to be masked
-    Returns:
-        - **outputs**: Tensor produces by relative multi head attention module.
-    """
     def __init__(self, h, d_model, dropout_p=0.1):
         super(MultiHeadedAttention, self).__init__()
         assert d_model % h == 0, "d_model % h should be zero."
@@ -169,13 +152,9 @@ class MultiHeadedAttention(nn.Module):
         query = self.query_proj(query).view(batch_size, -1, self.h, self.d_k)
         key = self.key_proj(key).view(batch_size, -1, self.h, self.d_k).permute(0, 2, 1, 3)
         value = self.value_proj(value).view(batch_size, -1, self.h, self.d_k).permute(0, 2, 1, 3)
-        pos_embedding = self.pos_proj(pos_embedding).view(batch_size, -1, self.h, self.d_k)
 
         content_score = torch.matmul((query + self.u_bias).transpose(1, 2), key.transpose(2, 3))
-        pos_score = torch.matmul((query + self.v_bias).transpose(1, 2), key.permute(0, 2, 3, 1))
-        pos_score = self._compute_relative_positional_encoding(pos_score)
-
-        score = (content_score + pos_score) / self.sqrt_dim
+        score = (content_score ) / self.sqrt_dim
 
         if mask is not None:
             mask = mask.unsqueeze(1)
