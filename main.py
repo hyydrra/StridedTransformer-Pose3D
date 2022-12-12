@@ -67,14 +67,18 @@ def step(split, opt, actions, dataLoader, model, optimizer=None, epoch=None):
             xyz[:, :, 0, :] = 0
             output_3D = model_refine(output_3D, xyz) 
 
+
         if split == 'train':
             if opt.refine:
                 loss = mpjpe_cal(output_3D, out_target_single)
+                loss1 = copy.deepcopy(loss)
             else:
+                # print(out_target.shape, out_target_single.shape)
                 loss = mpjpe_cal(output_3D_VTE, out_target) + mpjpe_cal(output_3D, out_target_single)
+                loss1 = mpjpe_cal(output_3D, out_target_single)
 
                 N = input_2D.size(0)
-                loss_all['loss'].update(loss.detach().cpu().numpy() * N, N)
+                loss_all['loss'].update(loss1.detach().cpu().numpy() * N, N)
 
             optimizer.zero_grad()
             loss.backward()
