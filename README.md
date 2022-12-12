@@ -1,18 +1,13 @@
 # Exploiting Temporal Contexts with Strided Transformer for 3D Human Pose Estimation
 
 
-This is the official implementation of the approach described in the paper:
+This is the modified implementation of the approach described in the paper:
 
 > Wenhao Li, Hong Liu, Runwei Ding, Mengyuan Liu, Pichao Wang, and Wenming Yang. [Exploiting Temporal Contexts with Strided Transformer for 3D Human Pose Estimation](https://arxiv.org/pdf/2103.14304). IEEE Transactions on Multimedia, 2022.
 
 
 | ![skating](figure/skating.gif)  | ![dancing](figure/dancing.gif) |
 | ------------- | ------------- |
-
-
-## News
--  03/24/2022: Demo and in-the-wild inference code are released!
-- 03/15/2022: Our method has been verified in [self-supervised pre-training](https://arxiv.org/pdf/2203.07628.pdf) as a backbone network! 
 
 
 ## Dependencies
